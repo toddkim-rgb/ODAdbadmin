@@ -7,6 +7,7 @@
 
 ## 실행
 
+- **온라인 시연: https://odadbadmin.vercel.app** (GitHub `main`에 올리면 Vercel이 자동으로 다시 배포합니다)
 - `index.html`을 Chrome·Edge·Whale에서 바로 열면 됩니다.
 - 또는 상위 폴더에서 로컬 서버로 실행합니다.
 
