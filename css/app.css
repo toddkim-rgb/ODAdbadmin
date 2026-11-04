@@ -463,7 +463,16 @@ tr.selrow td{background:color-mix(in srgb,var(--accentSoft) 80%,transparent)!imp
 .gwrap{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto;max-height:680px;position:relative}
 .rm-gantt{display:grid;grid-template-columns:340px auto;min-width:max-content}
 .rm-gantt .hcell{position:sticky;top:0;z-index:3;background:var(--panel);border-bottom:1px solid var(--line);height:32px;display:flex;align-items:center}
-.rm-gantt .hname{left:0;z-index:4;padding-left:12px;font-size:11.5px;color:var(--muted);border-right:1px solid var(--line)}
+.rm-gantt .hname{left:0;z-index:4;padding-left:8px;font-size:11.5px;color:var(--muted);border-right:1px solid var(--line);gap:1px}
+.rm-gantt .rm-sk{display:inline-flex;align-items:center;gap:3px;background:none;border:0;border-radius:5px;padding:3px 5px;font:inherit;color:var(--muted);cursor:pointer;white-space:nowrap}
+.rm-gantt .rm-sk i{font-style:normal;font-size:9px;opacity:.45}
+.rm-gantt .rm-sk:hover{background:var(--ground);color:var(--ink)}
+.rm-gantt .rm-sk:hover i{opacity:.8}
+.rm-gantt .rm-sk.on{color:var(--accentText);font-weight:600;background:var(--accentSoft)}
+.rm-gantt .rm-sk.on i{opacity:1}
+.rm-gantt .rm-sk:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.rm-gantt .rm-dot{color:var(--line);padding:0 1px}
+.rm-gantt .rm-vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .rm-gantt .years{position:relative;height:32px}
 .rm-gantt .years div{position:absolute;top:8px;width:34px;margin-left:-17px;font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:10.5px;color:var(--muted);text-align:center}
 .rm-gantt .years div.now{color:var(--accentText);font-weight:600}

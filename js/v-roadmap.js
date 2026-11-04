@@ -89,13 +89,45 @@
   };
 
   A.page('/roadmap', { menu: 'roadmap', title: '전 주기 로드맵' }, (view, _, q) => {
-    const f = (A.state.rm = A.state.rm || { q: '', rg: '', tp: '', fd: '', sp: '', qc: false, grp: '', sort: 'new', ph: '', due: false, sel: null, y: '' });
+    const f = (A.state.rm = A.state.rm || { q: '', rg: '', ct: '', tp: '', stg: '', fd: '', sp: '', qc: false, grp: '', sort: 'new', dir: 1, ph: '', due: false, sel: null, y: '' });
     if (Object.keys(q).length) { Object.assign(f, { ph: q.ph || '', y: q.y || '', due: q.due === '1' }); history.replaceState(null, '', '#/roadmap'); }
     const T = U.today(), TY = +T.slice(0, 4), NOW = U.yfrac(T), DUE = TY + 1;
     const all = A.visibleProjects();
     const cnt = k => all.filter(p => A.phaseOf(p) === k).length;
     const nDue = all.filter(p => A.isDue(p, DUE)).length;
     const dd = U.diffD(T, `${DUE}-02-28`);
+    const idx = (arr, v) => { const i = arr.indexOf(v); return i < 0 ? 999 : i; };
+    const STG_ORD = K.STAGES.map(s => s.k), TP_ORD = A.code('type'), PH_ORD = Object.values(A.PHASES);
+    const subRank = p => idx(K.SUBS[p.stage] || [], p.sub);
+    const SORTS = {
+      new: (a, b) => b.startYear - a.startYear || b.endYear - a.endYear || a.id.localeCompare(b.id),
+      old: (a, b) => a.startYear - b.startYear || a.endYear - b.endYear,
+      end: (a, b) => b.endYear - a.endYear || b.startYear - a.startYear,
+      nm: (a, b) => a.name.localeCompare(b.name, 'ko'),
+      ct: (a, b) => a.country.localeCompare(b.country, 'ko'),
+      tp: (a, b) => idx(TP_ORD, a.type) - idx(TP_ORD, b.type) || a.type.localeCompare(b.type, 'ko'),
+      st: (a, b) => STG_ORD.indexOf(a.stage) - STG_ORD.indexOf(b.stage) || subRank(a) - subRank(b) || String(a.sub || '').localeCompare(String(b.sub || ''), 'ko'),
+    };
+    const SK = [['nm', '사업'], ['ct', '국가'], ['tp', '유형'], ['st', '현재 단계']];
+    // 국가 목록은 고른 지역 안에서만 (건수 함께 표시)
+    const ctOpts = () => {
+      const L = all.filter(p => !f.rg || p.region === f.rg), cs = A.uniq(L, 'country');
+      if (f.ct && !cs.includes(f.ct)) f.ct = '';
+      return A.opts(cs.map(c => [c, `${c} (${L.filter(p => p.country === c).length})`]), f.ct);
+    };
+    // 현재 단계: 단계 전체 + 세부(발굴 · 선정, 보류(고도화) …), 진행 순서대로
+    const stgLabel = (k, sb) => (['HELD', 'REJECTED'].includes(k) ? `${K.stageName(k)}(${sb})` : `${K.stageName(k)} · ${sb}`);
+    const stgOpts = () => '<option value="">전체</option>' + K.STAGES.map(s => {
+      const L = all.filter(p => p.stage === s.k);
+      if (!L.length) return '';
+      const subs = A.uniq(L, 'sub').sort((a, b) => idx(K.SUBS[s.k] || [], a) - idx(K.SUBS[s.k] || [], b));
+      const head = `<option value="${s.k}" ${f.stg === s.k ? 'selected' : ''}>${s.n}${subs.length ? ' 전체' : ''} (${L.length})</option>`;
+      if (!subs.length) return head;
+      if (subs.length === 1 && L.every(p => p.sub === subs[0])) return `<option value="${s.k}" ${f.stg === s.k || f.stg === `${s.k}|${subs[0]}` ? 'selected' : ''}>${esc(stgLabel(s.k, subs[0]))} (${L.length})</option>`;
+      return `<optgroup label="${s.n}">${head}${subs.map(sb => { const v = `${s.k}|${sb}`; return `<option value="${esc(v)}" ${f.stg === v ? 'selected' : ''}>${esc(stgLabel(s.k, sb))} (${L.filter(p => p.sub === sb).length})</option>`; }).join('')}</optgroup>`;
+    }).join('');
+    const stgOk = p => !f.stg || (f.stg.includes('|') ? `${p.stage}|${p.sub}` === f.stg : p.stage === f.stg);
+    const active = () => !!(f.q || f.rg || f.ct || f.tp || f.stg || f.fd || f.sp || f.qc || f.ph || f.due || f.y);
     view.innerHTML = `
       ${A.ph('국토교통 ODA 사업 전 주기 로드맵', `발굴부터 추적조사·환류까지 사업 한 건의 전 주기를 연도 축으로 표시 · 기준 ${T} · 표시 사업 ${all.length}건 (공개 사업DB 119건 + 공모·심의 사업)`, A.can('projects', 'c') ? `<a class="btn pri" href="#/projects/new">${A.ICON.plus}신규 등록 (발굴)</a>` : '', '사업범위 나')}
       <div class="pipe rm">${['pre', 'drop', 'run', 'trk', 'end', 'end0'].map(k => `<button class="chip ${f.ph === k ? 'on' : ''}" data-ph="${k}"><span class="k"><i class="sw ${k}"></i>${A.PHASES[k]}</span><span class="v">${cnt(k)}</span></button>`).join('')}
@@ -103,13 +135,15 @@
       <div class="bar">
         <div class="fl"><span>검색</span><input type="search" id="r-q" value="${esc(f.q)}" placeholder="사업명·국가·사업ID"></div>
         <div class="fl"><span>지역</span><select id="r-rg">${A.opts(A.uniq(all, 'region'), f.rg)}</select></div>
+        <div class="fl"><span>국가</span><select id="r-ct">${ctOpts()}</select></div>
         <div class="fl"><span>유형</span><select id="r-tp">${A.opts(A.code('type'), f.tp)}</select></div>
+        <div class="fl"><span>현재 단계</span><select id="r-stg">${stgOpts()}</select></div>
         <div class="fl"><span>국토교통ODA 분야</span><select id="r-fd">${A.opts(A.code('field'), f.fd)}</select></div>
         <div class="fl"><span>시행계획 분야</span><select id="r-sp">${A.opts([['(공란)', '(공란)'], ...A.uniq(all, 'crs').map(x => [x, x])], f.sp)}</select></div>
         <label class="ck"><input type="checkbox" id="r-qc" ${f.qc ? 'checked' : ''}>공란·오류 있는 사업만</label>
-        <div class="fl"><span>그룹별 보기</span><select id="r-grp">${A.opts([['region', '지역별'], ['type', '사업유형별'], ['phase', '현재 단계별'], ['field', '국토교통ODA 분야별']], f.grp, '한 목록')}</select></div>
-        <div class="fl"><span>정렬</span><select id="r-sort">${A.opts([['new', '최신 사업 먼저'], ['old', '오래된 사업 먼저'], ['end', '종료년도 최근 순'], ['ct', '국가']], f.sort, null)}</select></div>
-        <span class="sp"></span><span class="summary" id="r-cnt"></span>
+        <div class="fl"><span>그룹별 보기</span><select id="r-grp">${A.opts([['region', '지역별'], ['country', '국가별'], ['type', '사업유형별'], ['phase', '현재 단계별'], ['field', '국토교통ODA 분야별']], f.grp, '한 목록')}</select></div>
+        <div class="fl"><span>정렬</span><select id="r-sort">${A.opts([['new', '최신 사업 먼저'], ['old', '오래된 사업 먼저'], ['end', '종료년도 최근 순'], ['nm', '사업명'], ['ct', '국가'], ['tp', '유형'], ['st', '현재 단계 (진행 순)']], f.sort, null)}</select></div>
+        <span class="sp"></span><button type="button" class="btn sm" id="r-reset" hidden>필터 초기화</button><span class="summary" id="r-cnt"></span>
       </div>
       <div class="legend rmleg"><span><i class="sw pre est"></i>발굴·예비 (빗금 = 실제 일자가 없어 규정으로 계산)</span><span><i class="sw pre"></i>발굴·예비 (실제 기록)</span><span><i class="sw plan"></i>수행 예정</span><span><i class="sw run"></i>수행 (사업기간)</span><span><i class="sw trk"></i>추적조사 (종료 후 매년 2월 · 프로젝트 5년·연수 1년·그 외 3년 · 2023년 이후 종료분)</span><span><i class="sw tick"></i>2월 보고 (✓ 제출 · 빨강 미제출)</span><span>${A.rmBadge('x', 'lg')}미선정</span><span>${A.rmBadge('hold', 'lg')}보류</span><span><i class="sw hand-l"></i>수원국 인계</span><span><b class="mk-l acc">↺</b>환류 (후속·연계 → 다음 발굴)</span></div>
       <div class="gwrap"><div class="rm-gantt" id="gt"></div></div>
@@ -126,14 +160,21 @@
       <aside class="drawer" id="drawer" hidden aria-label="사업 전 주기 상세"></aside>`;
     const gt = A.$('#gt', view);
     const dr = A.$('#drawer', view);
-    const grpKey = { region: p => p.region, type: p => p.type, phase: p => A.PHASES[A.phaseOf(p)], field: p => p.field };
+    const grpKey = { region: p => p.region, country: p => p.country, type: p => p.type, phase: p => A.PHASES[A.phaseOf(p)], field: p => p.field };
+    const grpSort = { type: (a, b) => idx(TP_ORD, a) - idx(TP_ORD, b), phase: (a, b) => PH_ORD.indexOf(a) - PH_ORD.indexOf(b) };
+    const grpOfSort = { ct: 'country', tp: 'type', st: 'phase' };
     const draw = () => {
-      let rows = all.filter(p => (!f.q || (p.name + p.country + p.id).includes(f.q)) && (!f.rg || p.region === f.rg) && (!f.tp || p.type === f.tp) && (!f.fd || p.field === f.fd) && (!f.sp || (p.crs || '(공란)') === f.sp) && (!f.qc || p.qc.length) && (!f.ph || A.phaseOf(p) === f.ph) && (!f.due || A.isDue(p, DUE)) && (!f.y || p.startYear === +f.y));
-      rows.sort((a, b) => (f.sort === 'old' ? a.startYear - b.startYear || a.endYear - b.endYear : f.sort === 'end' ? b.endYear - a.endYear || b.startYear - a.startYear : f.sort === 'ct' ? a.country.localeCompare(b.country, 'ko') || b.startYear - a.startYear : b.startYear - a.startYear || b.endYear - a.endYear || a.id.localeCompare(b.id)));
-      A.$('#r-cnt', view).innerHTML = `<b>${rows.length}</b>건 표시`;
+      let rows = all.filter(p => (!f.q || (p.name + p.country + p.id).includes(f.q)) && (!f.rg || p.region === f.rg) && (!f.ct || p.country === f.ct) && (!f.tp || p.type === f.tp) && stgOk(p) && (!f.fd || p.field === f.fd) && (!f.sp || (p.crs || '(공란)') === f.sp) && (!f.qc || p.qc.length) && (!f.ph || A.phaseOf(p) === f.ph) && (!f.due || A.isDue(p, DUE)) && (!f.y || p.startYear === +f.y));
+      const cmp = SORTS[f.sort] || SORTS.new, dir = SK.some(s => s[0] === f.sort) && f.dir < 0 ? -1 : 1;
+      rows.sort((a, b) => dir * cmp(a, b) || SORTS.new(a, b));
+      A.$('#r-cnt', view).innerHTML = `<b>${rows.length}</b>건 표시${rows.length !== all.length ? ` · 전체 ${all.length}건` : ''}`;
+      A.$('#r-reset', view).hidden = !active();
       const years = []; for (let y = Y0 + 1; y < Y1; y += 2) years.push(y);
-      let html = `<div class="hcell hname">사업 · 국가 · 유형 · 현재 단계</div><div class="hcell"><div class="years" style="width:${(Y1 - Y0) * YW}px">${years.map(y => `<div style="left:${X(y)}px" class="${y === TY ? 'now' : ''}">’${String(y).slice(2)}</div>`).join('')}</div></div>`;
-      const groups = f.grp ? A.uniq(rows, grpKey[f.grp]).map(g => [g, rows.filter(p => grpKey[f.grp](p) === g)]) : [[null, rows]];
+      let html = `<div class="hcell hname">${SK.map(([k, l]) => `<button type="button" class="rm-sk${f.sort === k ? ' on' : ''}" data-sk="${k}" title="${l} 순으로 정렬 · 다시 누르면 반대로">${l}<i aria-hidden="true">${f.sort === k ? (dir < 0 ? '▼' : '▲') : '↕'}</i><span class="rm-vh">${f.sort === k ? (dir < 0 ? ' 내림차순 정렬됨' : ' 오름차순 정렬됨') : ''}</span></button>`).join('<span class="rm-dot" aria-hidden="true">·</span>')}</div><div class="hcell"><div class="years" style="width:${(Y1 - Y0) * YW}px">${years.map(y => `<div style="left:${X(y)}px" class="${y === TY ? 'now' : ''}">’${String(y).slice(2)}</div>`).join('')}</div></div>`;
+      const gs = f.grp ? A.uniq(rows, grpKey[f.grp]) : [];
+      if (grpSort[f.grp]) gs.sort(grpSort[f.grp]);
+      if (grpOfSort[f.sort] === f.grp && dir < 0) gs.reverse();
+      const groups = f.grp ? gs.map(g => [g, rows.filter(p => grpKey[f.grp](p) === g)]) : [[null, rows]];
       groups.forEach(([g, list]) => {
         if (g) html += `<div class="grp">${esc(g)} <span class="muted">${list.length}</span></div>`;
         list.forEach(p => {
@@ -144,6 +185,12 @@
       });
       if (!rows.length) html += '<div class="grp" style="font-weight:400">조건에 맞는 사업이 없습니다. 필터를 풀어 보세요.</div>';
       gt.innerHTML = html;
+      A.$$('[data-sk]', gt).forEach(b => (b.onclick = () => {
+        const k = b.dataset.sk;
+        f.dir = f.sort === k ? -(f.dir || 1) : 1; f.sort = k;
+        A.$('#r-sort', view).value = k; draw();
+        const nb = A.$(`[data-sk="${k}"]`, gt); if (nb) nb.focus();
+      }));
       A.$$('.gr', gt).forEach(r => {
         r.onclick = () => openD(r.dataset.id);
         r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openD(r.dataset.id); } };
@@ -162,7 +209,10 @@
     A.$$('[data-ph]', view).forEach(b => (b.onclick = () => { f.ph = f.ph === b.dataset.ph ? '' : b.dataset.ph; f.due = false; A.render(); }));
     A.$('[data-due]', view).onclick = () => { f.due = !f.due; f.ph = ''; A.render(); };
     A.$('#r-q', view).oninput = e => { f.q = e.target.value; draw(); };
-    [['rg', 'r-rg'], ['tp', 'r-tp'], ['fd', 'r-fd'], ['sp', 'r-sp'], ['grp', 'r-grp'], ['sort', 'r-sort']].forEach(([k, id]) => (A.$('#' + id, view).onchange = e => { f[k] = e.target.value; draw(); }));
+    [['ct', 'r-ct'], ['tp', 'r-tp'], ['stg', 'r-stg'], ['fd', 'r-fd'], ['sp', 'r-sp'], ['grp', 'r-grp']].forEach(([k, id]) => (A.$('#' + id, view).onchange = e => { f[k] = e.target.value; draw(); }));
+    A.$('#r-rg', view).onchange = e => { f.rg = e.target.value; A.$('#r-ct', view).innerHTML = ctOpts(); draw(); };
+    A.$('#r-sort', view).onchange = e => { f.sort = e.target.value; f.dir = 1; draw(); };
+    A.$('#r-reset', view).onclick = () => { Object.assign(f, { q: '', rg: '', ct: '', tp: '', stg: '', fd: '', sp: '', qc: false, ph: '', due: false, y: '' }); A.render(); };
     A.$('#r-qc', view).onchange = e => { f.qc = e.target.checked; draw(); };
     draw();
     if (f.sel && A.P(f.sel)) openD(f.sel);
