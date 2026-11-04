@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KIDC 사업DB 관리시스템</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="주 메뉴">
+    <div class="brandrow">
+      <img class="brandsym" src="assets/kidc_logo.png" alt="">
+      <div class="brandtx"><b>사업DB 관리시스템</b><span>국제개발협력센터</span></div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidefoot">
+      <div>프로토타입 · 데모 데이터<br>사업 119건은 사업 전 주기 로드맵 원천자료, 계약·집행·결재·성과 정보는 시연용 생성 데이터입니다.</div>
+      <button id="reset" type="button">데모 데이터 초기화</button>
+    </div>
+  </aside>
+  <div class="main">
+    <header class="top">
+      <button class="iconbtn menu-btn" id="menu-btn" aria-label="메뉴 열기"></button>
+      <div class="crumb" id="crumb"></div>
+      <div class="sp"></div>
+      <label class="who"><span class="nm muted">사용자 전환(데모)</span><select id="who" aria-label="사용자 전환"></select></label>
+      <button class="iconbtn" id="theme" aria-label="화면 테마 전환" title="라이트/다크 전환"></button>
+      <div style="position:relative">
+        <button class="iconbtn" id="bell" aria-label="알림"><span class="dot" id="bell-dot" hidden>0</span></button>
+        <div class="pop" id="bell-pop" hidden></div>
+      </div>
+    </header>
+    <main id="view" tabindex="-1"></main>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+<script src="lib/echarts.min.js"></script>
+<script src="lib/world.js"></script>
+<script src="js/seed-projects.js"></script>
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/v-dashboard.js"></script>
+<script src="js/v-projects.js"></script>
+<script src="js/v-detail.js"></script>
+<script src="js/v-work.js"></script>
+<script src="js/v-stats.js"></script>
+<script src="js/v-admin.js"></script>
+<script src="js/v-roadmap.js"></script>
+<script src="js/v-feedback.js"></script>
+<script src="js/v-homepage.js"></script>
+<script>
+  App.$('#menu-btn').innerHTML = App.ICON.menu;
+  App.$('#theme').innerHTML = App.ICON.moon;
+  App.$('#bell').insertAdjacentHTML('afterbegin', App.ICON.bell);
+  App.init();
+</script>
+</body>
+</html>
